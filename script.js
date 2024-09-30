@@ -2066,6 +2066,8 @@ function getThemeColorFromState() {
 function getTweetInfo(id) {
   let tweetEntities = getStateEntities()?.tweets?.entities
   if (tweetEntities) {
+    // show tweets data
+    //console.log("tweetEntities", tweetEntities)
     let tweetInfo = tweetEntities[id]
     if (!tweetInfo) {
       warn('tweet info not found')
@@ -2107,7 +2109,7 @@ function isObserving(observers, name) {
 }
 
 function log(...args) {
-  if (debug) {
+  if (debug || !true) {
     let page = currentPage?.replace(/(\r?\n)+/g, ' ')
     console.log(`${page ? `(${
       page.length < 42 ? page : page.slice(0, 42) + '…'
@@ -4350,10 +4352,38 @@ function onTimelineChange($timeline, page, options = {}) {
     }
 
     hidPreviousItem = hideItem
+
+    console.log("$tweet", $tweet)
+    if ($tweet) {
+      const links = $tweet.querySelectorAll('a[href]');
+      const tweetLink = Array.from(links).find(link => link.href.match(/\/[^/]+\/status\/\d+/))?.href;
+      console.log("tweetLink", tweetLink)
+      const tweet_id = tweetLink.match(/\/status\/(\d+)/)[1];
+
+      let tweetInfo = getTweetInfo(tweet_id)
+      saveTweet(tweetLink, tweet_id, tweetInfo)
+    }
+
+    // const all_entities = getStateEntities()?.tweets?.entities;
+    //
+    // for (const [tweet_id, _] of Object.entries(all_entities)) {
+    //   let tweetInfo = getTweetInfo(tweet_id)
+    //   // const tweetUrl = $tweet.querySelector('a[href^="/[^/]+/status/"]')?.href;
+    //   const links = $tweet.querySelectorAll('a[href]');
+    //   const tweetLink = Array.from(links).find(link => link.href.match(/\/[^/]+\/status\/\d+/))?.href;
+    //
+    //   //console.log("tweetInfo 123", links, tweetUrl)
+    //   //console.log("tweetInfo 123", tweetUrl, tweetInfo)
+    //   saveTweet(tweetLink, tweet_id, tweetInfo)
+    // }
+
+    // https://x.com/ilblackdragon/status/
   }
 
   for (let change of changes) {
     /** @type {HTMLElement} */ (change.$item.firstElementChild).style.display = change.hideItem ? 'none' : ''
+
+    console.log("change", change)
   }
 
   log(
@@ -4861,6 +4891,44 @@ function restoreLinkHeadline($tweet) {
   }
 }
 
+let twits_queue = [];
+
+function saveTweet(tweetLink, tweetId, tweetInfo) {
+  if (!tweetLink || !tweetId || !tweetInfo) {
+    return console.log("saveTweet: illegal data", tweetLink, tweetId, tweetInfo)
+  }
+
+  if (!tweetLink.startsWith(`https://x.com`)){
+    tweetLink = `https://x.com${tweetLink}`;
+  }
+
+  // trim url params
+  tweetLink = tweetLink.split('?')[0];
+
+  // trim last slash
+  tweetLink = tweetLink.replace(/\/$/, "");
+
+  // let accounts_to_track = [];
+  // try{
+  //   accounts_to_track = JSON.parse(localStorage.getItem('accounts_to_track'))
+  // }
+  // catch (ex) {
+  //   console.log("accounts_to_track parse error: ", ex)
+  // }
+
+  // save tweet info
+  //if (!twits_queue.includes(tweetLink) || accounts_to_track.includes(tweetInfo.user)) {
+  console.log("twits_queue", twits_queue, tweetLink)
+  if (!twits_queue.includes(tweetLink)) {
+    twits_queue.push(tweetLink)
+    log('save tweet', {tweetLink, tweetId, tweetInfo})
+    // console.log('content tabId', chrome.runtime)
+    // console.log(tweetInfo.full_text)
+    // chrome.runtime.sendMessage({ action: "closeTab" });
+    window.postMessage({action: "sendData", tweet: {tweetLink, tweetId, tweetInfo}}, "*");
+  }
+}
+
 /**
  * @param {HTMLElement} $focusedTweet
  */
@@ -4870,6 +4938,30 @@ function restoreTweetInteractionsLinks($focusedTweet) {
   let [tweetLink, tweetId] = location.pathname.match(/^\/[a-zA-Z\d_]{1,20}\/status\/(\d+)/) ?? []
   let tweetInfo = getTweetInfo(tweetId)
   log('focused tweet', {tweetLink, tweetId, tweetInfo})
+
+  // console.log("chrome", chrome)
+
+
+  saveTweet(tweetLink, tweetId, tweetInfo)
+  // let accounts_to_track = [];
+  // try{
+  //   accounts_to_track = JSON.parse(localStorage.getItem('accounts_to_track'))
+  // }
+  // catch (ex) {
+  //   console.log("accounts_to_track parse error: ", ex)
+  // }
+  //
+  // // save tweet info
+  // if (!twits_queue.includes(tweetLink) || accounts_to_track.includes(tweetInfo.user)) {
+  //   twits_queue.push(tweetLink)
+  //   log('save tweet', {tweetLink, tweetId, tweetInfo})
+  //   // console.log('content tabId', chrome.runtime)
+  //   // console.log(tweetInfo.full_text)
+  //   // chrome.runtime.sendMessage({ action: "closeTab" });
+  //   window.postMessage({action: "sendData", data: tweetInfo}, "*");
+  // }
+
+
   if (!tweetInfo) return
 
   let shouldDisplayLinks = (
