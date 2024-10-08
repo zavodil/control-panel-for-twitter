@@ -40,6 +40,31 @@ async function getPendingTweets() {
     }
 }
 
+
+async function getAccountsToTrack() {
+    try {
+        const response = await fetch('http://127.0.0.1:8009/get_accounts_to_track/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Получаем JSON данные из ответа
+        accounts_to_track = await response.json();
+        console.log("Update accounts_to_track", accounts_to_track)
+        saveToLocalStorage({key: "accounts_to_track", value: JSON.stringify(accounts_to_track)});
+
+
+    } catch (error) {
+        console.error('Error fetching accounts_to_track:', error);
+    }
+}
+
 function removeUrl(url) {
     const indexToRemove = url_queue.indexOf(url);
     if (indexToRemove !== -1) {
@@ -120,7 +145,11 @@ async function updateTweet(tweet_url, tweet_text, tweet_time, tweet_data) {
 }
 
 function parseTweetData(tweet_data){
-    return  {
+    let all_media_data = tweet_data.entities?.media ?? [];
+    console.log("all_media_data", all_media_data)
+    let media_urls = all_media_data.map(item => { return {type: item?.type, url: item?.media_url_https}} ) ?? [];
+    console.log("media_urls", media_urls)
+    let result = {
         bookmark_count: tweet_data.bookmark_count,
         favorite_count: tweet_data.favorite_count, // likes
         lang: tweet_data.lang,
@@ -133,9 +162,22 @@ function parseTweetData(tweet_data){
         // user: tweet_data.user,
         user_mentions: JSON.stringify(tweet_data.entities?.user_mentions ?? []),
         hashtags : JSON.stringify(tweet_data.entities?.hashtags ?? []),
+        media_urls,
         quoted_status: tweet_data?.quoted_status,
-        quoted_tweet: tweet_data?.quoted_status_permalink?.expanded
+        quoted_tweet: tweet_data?.quoted_status_permalink?.expanded,
+        conversation_id_str: tweet_data.conversation_id_str,
     };
+    if (tweet_data?.in_reply_to_user) {
+        result.in_reply_to_user = tweet_data?.in_reply_to_user;
+    }
+    if (tweet_data?.in_reply_to_screen_name) {
+        result.in_reply_to_screen_name = tweet_data?.in_reply_to_screen_name;
+    }
+    if (tweet_data?.in_reply_to_status_id_str) {
+        result.in_reply_to_status_id_str = tweet_data?.in_reply_to_status_id_str;
+    }
+
+    return result;
 }
 
 async function addFullTweet(tweet_url, tweet_text, tweet_time, tweet_data) {
@@ -262,6 +304,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "localStorageSaved") {
         console.log("Данные успешно сохранены в localStorage");
     }
+
+
+
+    console.log("bg request", request)
+    if (request.action === "PRODUCE_TWEET_REPLY") {
+        console.log("GOT PRODUCE_TWEET_REPLY")
+        const handleRequest = async () => {
+            try {
+                const response = await fetch("http://127.0.0.1:8009/tweet_reply/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(request.data)
+                });
+
+                console.log("PRODUCE_TWEET_REPLY response", response)
+                // Обработка ответа
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log("PRODUCE_TWEET_REPLY result", result)
+                    sendResponse({ success: true, data: result, replyButton: request.replyButton });
+                } else {
+                    sendResponse({ success: false, error: response.statusText });
+                }
+            } catch (error) {
+                sendResponse({ success: false, error: error.message });
+            }
+        };
+
+        // Вызовем асинхронную функцию
+        handleRequest();
+
+        // Возвращаем true для указания, что ответ будет асинхронным
+        return true;
+    }
 });
 
 //loadTwit()
@@ -270,15 +348,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 //     await getPendingTweets()
 // }, 5000);
 getPendingTweets()
+getAccountsToTrack()
 
-let accounts_to_track=[
-    "81185431" // illia
-]
+let accounts_to_track = [];
+// let accounts_to_track=[
+//     "81185431" // illia
+// ]
+// saveToLocalStorage({key: "accounts_to_track", value: JSON.stringify(accounts_to_track)});
 
 let contentScriptReady = false;
 let pendingMessages = [];
 
-saveToLocalStorage({key: "accounts_to_track", value: JSON.stringify(accounts_to_track)});
+
+
 function saveToLocalStorage(data) {
     if (!contentScriptReady) {
         console.log("Content script еще не готов. Сообщение добавлено в очередь.");

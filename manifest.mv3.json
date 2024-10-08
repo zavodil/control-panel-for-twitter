@@ -51,5 +51,11 @@
     "storage",
     "tabs",
     "activeTab"
-  ]
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8009/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; connect-src 'self' http://127.0.0.1:8009;"
+  }
 }

@@ -80,6 +80,38 @@ window.addEventListener("message", (event) => {
     });
 
   }
+
+  if (event.data.type === "SEND_TWEET_REPLY") {
+    // Отправляем запрос в background.js
+    console.log("forward SEND_TWEET_REPLY in content")
+    chrome.runtime.sendMessage({action: "PRODUCE_TWEET_REPLY", data: event.data.data, replyButton: event.data.replyButton }, (response) => {
+      // Здесь вы получаете ответ от background.js
+      if (response.success) {
+        console.log("Ответ от background.js:", response.data, response.replyButton);
+        // Пересылаем ответ обратно в script.js
+        window.postMessage({type: "PRODUCE_TWEET_REPLY", success: response.success, data: response.data, replyButton: response.replyButton}, "*");
+      } else {
+        console.error("Ошибка:", response.error);
+      }
+    });
+  }
+
+  // console.log("event addEventListener content", event)
+  //
+  // if (event.data.type === "PRODUCE_TWEET_REPLY") {
+  //   // Отправляем запрос в background.js
+  //   chrome.runtime.sendMessage(event.data.data, (response) => {
+  //     // Обрабатываем ответ от background.js
+  //     if (response.success) {
+  //       console.log("Ответ от background.js:", response.data);
+  //       // Вызываем функцию для обработки данных в script.js, если нужно
+  //       window.postMessage({ type: "PRODUCE_TWEET_REPLY", data: response.data }, "*");
+  //     } else {
+  //       console.error("Ошибка:", response.error);
+  //     }
+  //   });
+  // }
+
 });
 
 // Inject config changes from options pages into the settings <script>
@@ -129,3 +161,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   }
 });
+
+//
+// setInterval(()=> {
+//   let $timeline = /** @type {HTMLElement} */ (document.querySelector('[data-testid="vss-scroll-view"] > div'))
+//   console.log("$timeline", $timeline, document)
+//   if ($timeline) {
+//     for (let $item of $timeline.children) {
+//       //   TWEET: '[data-testid="tweet"]',
+//       let $tweet = $item.querySelector('[data-testid="tweet"]')
+//
+//       if ($tweet && !$tweet.querySelector(".reply-button")) {
+//         // Создаем новую кнопку
+//         let $button = document.createElement("button");
+//         $button.innerText = "Ответить11"; // Текст кнопки
+//         $button.classList.add("reply-button"); // Добавляем класс для идентификации кнопки
+//
+//         // Добавляем обработчик событий для кнопки
+//         $button.addEventListener("click", async () => {
+//           // Данные для отправки
+//           const data = {
+//             message: "Hello, Illia!", // Замените это на нужное сообщение
+//             old_messages: [] // Замените это на массив старых сообщений, если нужно
+//           };
+//
+//           window.postMessage({type: "SEND_TWEET_REPLY", data: data}, "*");
+//
+//           // try {
+//           //   const response = await fetch("http://127.0.0.1:8009/tweet_reply/", {
+//           //     method: "POST",
+//           //     headers: {
+//           //       "Content-Type": "application/json"
+//           //     },
+//           //     body: JSON.stringify(data)
+//           //   });
+//           //
+//           //   // Обработка ответа
+//           //   if (response.ok) {
+//           //     const result = await response.json();
+//           //     console.log("Ответ от сервера:", result);
+//           //   } else {
+//           //     console.error("Ошибка при отправке запроса:", response.statusText);
+//           //   }
+//           // } catch (error) {
+//           //   console.error("Ошибка сети:", error);
+//           // }
+//         });
+//
+//         // Добавляем кнопку под элементом твита
+//         $tweet.appendChild($button);
+//       }
+//     }
+//   }
+// }, 1000);

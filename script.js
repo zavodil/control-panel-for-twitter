@@ -4353,7 +4353,11 @@ function onTimelineChange($timeline, page, options = {}) {
 
     hidPreviousItem = hideItem
 
-    console.log("$tweet", $tweet)
+    if ($tweet) {
+      console.log("$tweet", $tweet)
+    }
+
+    const replyOptions = ["@ilblackdragon", "0xMert_", "@NearProtocol"];
     if ($tweet) {
       const links = $tweet.querySelectorAll('a[href]');
       const tweetLink = Array.from(links).find(link => link.href.match(/\/[^/]+\/status\/\d+/))?.href;
@@ -4362,7 +4366,156 @@ function onTimelineChange($timeline, page, options = {}) {
 
       let tweetInfo = getTweetInfo(tweet_id)
       saveTweet(tweetLink, tweet_id, tweetInfo)
+
+
+      if (!$tweet.querySelector(".ai-reply-container")) {
+        // Create a container for the main button and dropdown
+        let $container = document.createElement("div");
+        $container.style.display = "inline-flex"; // Use flexbox to align main button and dropdown toggle in one row
+        $container.style.position = "relative"; // Set relative positioning for absolute child elements
+        $container.classList.add("ai-reply-container");
+
+        // Create the main button that triggers the action
+        let $mainButton = document.createElement("button");
+        //$mainButton.textContent = `Reply as ${localStorage.getItem("selectedOption") || "AI"}`; // Button text (default or saved option)
+        $mainButton.textContent = localStorage.getItem("selectedOption") || "AI"; // Button text (default or saved option)
+        $mainButton.style.paddingRight = "2px";
+        $mainButton.classList.add("ai-reply-button");
+        $mainButton.classList.add('css-175oi2r', 'r-1777fci', 'r-bt1l66', 'r-bztko3', 'r-lrvibr', 'r-1loqt21', 'r-1ny4l3l');
+
+        // Create the dropdown toggle button
+        let $dropdownToggle = document.createElement("button");
+        $dropdownToggle.textContent = "▼"; // Icon for toggling the dropdown
+        $dropdownToggle.gapSize = "0px";
+        $dropdownToggle.fontSize = "8px";
+        $dropdownToggle.style.padding = "0px";
+        $dropdownToggle.style.marginLeft = "0px"; // Add space between the main button and dropdown toggle
+        $dropdownToggle.classList.add('css-175oi2r', 'r-1777fci', 'r-bt1l66', 'r-bztko3', 'r-lrvibr', 'r-1loqt21', 'r-1ny4l3l');
+
+        // Create the dropdown menu
+        let $dropdown = document.createElement("div");
+        $dropdown.style.display = "none"; // Initially hidden
+        $dropdown.style.position = "absolute"; // Positioning relative to the body
+        $dropdown.style.backgroundColor = "white";
+        $dropdown.style.border = "1px solid #ccc";
+        $dropdown.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.2)";
+        $dropdown.style.zIndex = "9999"; // Make sure it's above all elements
+
+        replyOptions.forEach(option => {
+          let $option = document.createElement("div");
+          $option.textContent = option;
+          $option.style.padding = "5px 10px";
+          $option.style.cursor = "pointer";
+
+          // Обработчик клика на опцию
+          $option.addEventListener("click", () => {
+            $mainButton.textContent = option; // Меняем текст основной кнопки на выбранную опцию
+            localStorage.setItem("selectedOption", option); // Сохраняем выбор в localStorage
+            $dropdown.style.display = "none"; // Скрываем выпадающее меню после выбора
+          });
+
+          // Добавляем опцию в выпадающее меню
+          $dropdown.appendChild($option);
+        });
+
+        // Toggle the visibility of the dropdown menu
+        $dropdownToggle.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if ($dropdown.style.display === "none") {
+            // Show dropdown and position it relative to the main button
+            let rect = $mainButton.getBoundingClientRect();
+            $dropdown.style.top = `${rect.bottom + window.scrollY}px`; // Position below the button
+            $dropdown.style.left = `${rect.left + window.scrollX}px`; // Align with the button
+            $dropdown.style.display = "block";
+          } else {
+            $dropdown.style.display = "none";
+          }
+        });
+
+        // Close the dropdown menu when clicking outside of it
+        document.addEventListener("click", () => {
+          $dropdown.style.display = "none";
+        });
+
+        // Append elements to the container
+        $container.appendChild($mainButton); // Main button
+        $container.appendChild($dropdownToggle); // Dropdown toggle button
+
+        document.body.appendChild($dropdown);
+
+
+        let $tweet = $item.querySelector(Selectors.TWEET);
+        let $buttonBlock = $tweet.querySelector('[role="group"]');
+        console.log("$buttonBlock", $buttonBlock)
+        $buttonBlock.firstChild.appendChild($container)
+        // $buttonBlock.insertBefore($container, $buttonBlock.firstChild);
+
+        let $replyButton = $tweet.querySelector('button[data-testid="reply"]');
+
+        if (!$replyButton.id) {
+          $replyButton.id = generateRandomId(32); // Генерируем id длиной 32 символа
+        }
+
+        $mainButton.addEventListener("click", async () => {
+          showLoadingSpinner();
+
+          // Получаем выбранную опцию из localStorage или используем по умолчанию
+          const selectedOption = localStorage.getItem("selectedOption") || replyOptions[0];
+
+          // Данные для отправки
+          const data = {
+            role: selectedOption,
+            message: `${selectedOption}: ${tweetInfo.full_text}`, // Включаем выбранную опцию в сообщение
+            old_messages: []
+          };
+
+          console.log("SEND_TWEET_REPLY sent from script with option:", selectedOption);
+          window.postMessage({type: "SEND_TWEET_REPLY", data: data, replyButton: $replyButton.id}, "*");
+        });
+
+
+
+        // // Создаем новую кнопку
+        // let $button = document.createElement("button");
+        // $button.textContent = "AIReply"; // Текст кнопки
+        // $button.style.paddingRight = "10px";
+        // $button.classList.add("ai-reply-button"); // Добавляем класс для идентификации кнопки
+        // $button.classList.add('css-175oi2r', 'r-1777fci', 'r-bt1l66', 'r-bztko3', 'r-lrvibr', 'r-1loqt21', 'r-1ny4l3l');
+        //
+        // // Добавляем кнопку под элементом твита
+        // let $tweet = $item.querySelector(Selectors.TWEET);
+        // let $buttonBlock = $tweet.querySelector('[role="group"]');
+        // $buttonBlock.insertBefore($button, $buttonBlock.firstChild);
+        //
+        // let $replyButton =  $tweet.querySelector('button[data-testid="reply"]');
+        //
+        // if (!$replyButton.id) {
+        //   $replyButton.id = generateRandomId(32);  // Генерируем id длиной 32 символа
+        // }
+        // console.log("$replyButton,", $replyButton)
+        // //$replyButton.click();
+        // //return;
+        //
+        //
+        // // Добавляем обработчик событий для кнопки
+        // $button.addEventListener("click", async () => {
+        //   showLoadingSpinner();
+        //   // Данные для отправки
+        //   const data = {
+        //     message: tweetInfo.full_text, // "Hello, Illia!", // Замените это на нужное сообщение
+        //     old_messages: [] // Замените это на массив старых сообщений, если нужно
+        //   };
+        //
+        //   console.log("SEND_TWEET_REPLY sent from script")
+        //   window.postMessage({type: "SEND_TWEET_REPLY", data: data, replyButton: $replyButton.id}, "*");
+        //
+        // });
+      }
+
+
     }
+
+
 
     // const all_entities = getStateEntities()?.tweets?.entities;
     //
@@ -4919,6 +5072,7 @@ function saveTweet(tweetLink, tweetId, tweetInfo) {
   // save tweet info
   //if (!twits_queue.includes(tweetLink) || accounts_to_track.includes(tweetInfo.user)) {
   console.log("twits_queue", twits_queue, tweetLink)
+  console.log("tweetInfo", tweetInfo)
   if (!twits_queue.includes(tweetLink)) {
     twits_queue.push(tweetLink)
     log('save tweet', {tweetLink, tweetId, tweetInfo})
@@ -5915,3 +6069,108 @@ main()
 //#endregion
 
 }()
+
+function generateRandomId(length = 16) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+window.addEventListener("message", (event) => {
+  // TODO verify?
+  // if (event.source !== window) return; // Проверяем, что сообщение пришло из нашего скрипта
+
+  console.log("event addEventListener script", event)
+
+  if (event.data.type && event.data.type === "PRODUCE_TWEET_REPLY") {
+    let success = event.data.success;
+    let tweet_reply = event.data.data;
+    // replace trailing quotes
+    tweet_reply = tweet_reply.replace(/^"|"$/g, '');
+    console.log("tweet_reply", tweet_reply, success,event.data.replyButton )
+    if (tweet_reply) {
+      if (event.data.replyButton) {
+        hideLoadingSpinner()
+        let button = document.getElementById(event.data.replyButton)
+        if (button) {
+          button.click()
+
+          setTimeout(() => {
+            let $textarea = document.querySelector('div[data-testid="tweetTextarea_0"]');
+            $textarea.focus();
+            document.execCommand('insertText', false, tweet_reply);
+
+            //$textarea.innerText = tweet_reply;
+            //$textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          }, 1000)
+        }
+
+
+      }
+      // event.data.replyButton.click();
+    }
+
+  }
+});
+
+function showLoadingSpinner() {
+  let buttons = document.querySelectorAll('.ai-reply-container');
+
+  buttons.forEach(button => {
+    // Проверяем, есть ли уже спиннер, чтобы не добавлять его повторно
+    if (!button.querySelector('.spinner')) {
+      // Скрываем текст кнопки, но оставляем его в DOM
+      let originalText = button.querySelector('button.ai-reply-button');
+      originalText.style.visibility = 'hidden'; // Скрываем текст
+
+      // Создаем и добавляем спиннер
+      let spinner = document.createElement('div');
+      spinner.classList.add('spinner');
+      spinner.style.border = '4px solid rgba(0, 0, 0, 0.1)';
+      spinner.style.borderRadius = '50%';
+      spinner.style.borderTop = '4px solid #3498db';
+      spinner.style.width = '20px';
+      spinner.style.height = '20px';
+      spinner.style.animation = 'spin 1s linear infinite';
+      spinner.style.position = 'absolute'; // Позиционируем спиннер относительно кнопки
+      spinner.style.transform = 'translate(-50%, -50%)'; // Центрируем спиннер
+
+      button.style.position = 'relative'; // Для правильного позиционирования спиннера
+      button.appendChild(spinner);
+
+      // Добавляем анимацию через @keyframes
+      const styleSheet = document.createElement("style");
+      styleSheet.type = "text/css";
+      styleSheet.innerText = `
+        @keyframes spin { 
+          0% { transform: rotate(0deg); } 
+          100% { transform: rotate(360deg); } 
+        }
+      `;
+      document.head.appendChild(styleSheet);
+    }
+  });
+}
+
+
+
+function hideLoadingSpinner() {
+  let buttons = document.querySelectorAll('.ai-reply-container');
+
+  buttons.forEach(button => {
+    // Удаляем спиннер
+    let spinner = button.querySelector('.spinner');
+    if (spinner) {
+      spinner.remove(); // Удаляем спиннер из DOM
+    }
+
+    // Возвращаем видимость оригинального текста кнопки
+    let originalText = button.querySelector('button.ai-reply-button');
+    if (originalText) {
+      originalText.style.visibility = 'visible'; // Показываем текст кнопки
+    }
+  });
+}
